@@ -1,6 +1,8 @@
 # 1.资源规划
 
-官方：https://ceph.com/en，https://docs.ceph.com/en/latest/start/intro
+官方：https://ceph.com/en
+
+官方文档：https://docs.ceph.com/en/latest/start/intro
 
 ceph 是一种开源的分布式的存储系统 包含以下几种存储类型： 块存储（rbd），对象存储(RADOS Fateway)，文件系统（cephfs）
 
@@ -135,6 +137,8 @@ python3 setup.py install
 $ ceph-deploy --version
 2.0.1
 ```
+
+注：因为ubuntu 22.04没有之间apt install方式去安装的命令只能使用pip去安装。
 
 ### 2.2.3 创建 monitor 节点
 
