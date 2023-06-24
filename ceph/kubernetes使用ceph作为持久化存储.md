@@ -142,7 +142,7 @@ $ ceph-deploy --version
 2.0.1
 ```
 
-注：因为ubuntu 22.04没有之间apt install方式去安装的命令只能使用pip去安装。
+注：因为ubuntu 22.04不能apt install方式去安装的命令只能使用pip去安装，因为源里面没找到。
 
 ### 2.2.3 创建 monitor 节点
 
