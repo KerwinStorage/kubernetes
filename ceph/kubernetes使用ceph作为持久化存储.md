@@ -1735,4 +1735,4 @@ tmpfs                                                                           
 
 参考：http://docs.ceph.com/en/quincy/install/get-packages
 
-cephadm 安装 ceph 集群：https://xwls.github.io/2023/02/16/ceph-cluster-install/
+cephadm 安装 ceph 集群：https://xwls.github.io/2023/02/16/ceph-cluster-install
