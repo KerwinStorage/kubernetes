@@ -522,7 +522,7 @@ Deployment 更新特性：
 
 deployment 触发更新的时候，它确保至少所需 Pods 75% 处于运行状态（最大不可用 比例为 25%）。故像一个 pod 的情况，肯定是新创建一个新的 pod，新 pod 运行正常之 后，再关闭老的 pod。 默认情况下，它可确保启动的 Pod 个数比期望个数最多多出 25% 问题： 结合 ceph rbd 共享挂载的特性和 deployment 更新的特性，我们发现原因如下： 由于 deployment 触发更新，为了保证服务的可用性，deployment 要先创建一个 pod 并运行正常之后，再去删除老 pod。而如果新创建的 pod 和老 pod 不在一个 node，就会导致此故障。 解决办法： 1，使用能支持跨 node 和 pod 之间挂载的共享存储，例如 cephfs，GlusterFS 等 2，给 node 添加 label，只允许 deployment 所管理的 pod 调度到一个固定的 node 上。 （不建议，这个 node 挂掉的话，服务就故障了）
 
-# 4.基于ceph-csi 创建storageClass
+# 4.基于ceph-csi创建storageClass(rbd)
 
 kubernetes官网：https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#ceph-rbd
 
@@ -1453,12 +1453,290 @@ sr1     11:1    1   4.6G  0 rom
 rbd0   252:0    0     2G  0 disk /var/lib/www/html
 ```
 
+# 5.基于ceph-csi创建storageClass(cephfs)
+
+```shell
+ceph fs ls
+name: storageclass, metadata pool: cephfs_metadata, data pools: [cephfs_data ]
+```
+
+## 5.1.创建 ceph 子目录
+
+为了别的地方能挂载 cephfs，先创建一个 secretfile
+
+```shell
+cat /etc/ceph/ceph.client.admin.keyring |grep key|awk -F" " '{print $3}' > /etc/ceph/admin.secret
+# 挂载 cephfs 的根目录到集群的 mon 节点下的一个目录，比如 cephfs_data，因为挂载后，我们就可以直接在 cephfs_data 下面用 Linux 命令创建子目录了。
+cd /root ; mkdir -p cephfs_data
+mount -t ceph 192.168.80.66:6789:/ /root/cephfs_data -o name=admin,secretfile=/etc/ceph/admin.secret
+df -h | grep /root/cephfs_data
+192.168.80.66:6789:/  143G     0  143G   0% /root/cephfs_data
+
+cd /root/cephfs_data ; mkdir ceph ; chmod 0777 ceph
+```
+
+## 5.2.部署Ceph-CSI
+
+ceph-csib版本对照：https://github.com/ceph/ceph-csi#known-to-work-co-platforms
+
+```shell
+cd /root/ceph
+git clone https://github.com/ceph/ceph-csi.git
+cd ceph-csi/deploy/cephfs/kubernetes
+
+# 替换镜像
+cat ./*.yaml | grep image:
+          image: registry.k8s.io/sig-storage/csi-provisioner:v3.5.0
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.8.0
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v6.2.2
+          image: quay.io/cephcsi/cephcsi:canary
+          image: quay.io/cephcsi/cephcsi:canary
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.8.0
+          image: quay.io/cephcsi/cephcsi:canary
+          image: quay.io/cephcsi/cephcsi:canary
+
+sed -i s#registry.k8s.io/sig-storage#registry.cn-hangzhou.aliyuncs.com/image-storage#g *.yaml
+sed -i s#quay.io/cephcsi#registry.cn-hangzhou.aliyuncs.com/image-storage#g *.yaml
+```
+
+配置csi-config-map.yaml文件链接ceph集群的信息
+
+```shell
+cat > csi-config-map.yaml <<EOF
+---
+apiVersion: v1
+kind: ConfigMap
+data:
+  config.json: |-
+    [
+      {
+        "clusterID": "1ed6d2bd-52f1-4a95-bc36-2753f9892589",
+        "monitors": [
+          "192.168.80.55:6789",
+          "192.168.80.66:6789",
+          "192.168.80.77:6789"
+        ]
+      }
+    ]
+metadata:
+  name: ceph-csi-config
+EOF
+kubectl apply -f csi-config-map.yaml
+```
+
+## 5.3.部署cephfs相关的CSI
+
+```shell
+cd /root/ceph/ceph-csi/deploy/cephfs/kubernetes/
+kubectl apply -f .
+
+# 查看pod情况
+kubectl get pods | grep cephfs
+csi-cephfsplugin-6dnlt                          3/3     Running   0                39m
+csi-cephfsplugin-6nqdj                          3/3     Running   0                39m
+csi-cephfsplugin-n8lff                          3/3     Running   0                39m
+csi-cephfsplugin-provisioner-7d5b787d54-2pwx6   5/5     Running   0                39m
+csi-cephfsplugin-provisioner-7d5b787d54-k5fhh   5/5     Running   0                39m
+csi-cephfsplugin-provisioner-7d5b787d54-mcdf4   5/5     Running   0                39m
+```
+
+## 5.4.创建存储池
+
+查看集群状态
+
+```shell
+ceph -s
+  cluster:
+    id:     1ed6d2bd-52f1-4a95-bc36-2753f9892589
+    health: HEALTH_OK
+
+  services:
+    mon: 3 daemons, quorum master1-admin,node1-monitor,node2-osd (age 2h)
+    mgr: master1-admin(active, since 3h), standbys: node1-monitor, node2-osd
+    mds: 1/1 daemons up, 2 standby
+    osd: 3 osds: 3 up (since 53m), 3 in (since 8d)
+
+  data:
+    volumes: 1/1 healthy
+    pools:   5 pools, 113 pgs
+    objects: 51 objects, 8.0 MiB
+    usage:   83 MiB used, 300 GiB / 300 GiB avail
+    pgs:     113 active+clean
+```
+
+创建cephfs存储池fs_metadata，fs_data：
+
+```shell
+ceph osd pool create fs_metadata 128 128
+pool 'fs_metadata' created
+
+ceph osd pool create fs_data 128 128
+pool 'fs_data' created
+
+ceph fs new cephfs fs_metadata fs_data
+new fs with metadata pool 7 and data pool 8
+
+ceph osd lspools
+```
+
+获取集群信息和查看用户key
+
+```shell
+ceph mon dump
+epoch 1
+fsid 1ed6d2bd-52f1-4a95-bc36-2753f9892589
+last_changed 2023-06-22T21:46:24.547734+0800
+created 2023-06-22T21:46:24.547734+0800
+min_mon_release 17 (quincy)
+election_strategy: 1
+0: [v2:192.168.80.55:3300/0,v1:192.168.80.55:6789/0] mon.master1-admin
+1: [v2:192.168.80.66:3300/0,v1:192.168.80.66:6789/0] mon.node1-monitor
+2: [v2:192.168.80.77:3300/0,v1:192.168.80.77:6789/0] mon.node2-osd
+dumped monmap epoch 1
+
+ceph auth get client.admin
+[client.admin]
+        key = AQDJUJRkE8ilEBAA8MowiFQhpuIO48HaV5kYlg==
+        caps mds = "allow *"
+        caps mgr = "allow *"
+        caps mon = "allow *"
+        caps osd = "allow *"
+exported keyring for client.admin
+```
+
+## 5.5.验证
+
+### 5.5.1创建连接ceph集群的秘钥
+
+```shell
+cat > cephfs-secret.yaml <<EOF
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: csi-cephfs-secret
+  namespace: default
+stringData:
+  # Required for statically provisioned volumes
+  userID: admin
+  userKey: AQDJUJRkE8ilEBAA8MowiFQhpuIO48HaV5kYlg==
+
+  # Required for dynamically provisioned volumes
+  adminID: admin
+  adminKey: AQDJUJRkE8ilEBAA8MowiFQhpuIO48HaV5kYlg==	
+EOF
+kubectl apply -f cephfs-secret.yaml
+```
+
+### 5.5.2 创建storeclass
+
+```shell
+cat > cephfs-storageclass.yaml <<EOF
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: csi-cephfs-sc
+provisioner: cephfs.csi.ceph.com
+parameters:
+  clusterID: 1ed6d2bd-52f1-4a95-bc36-2753f9892589
+  fsName: cephfs
+  pool: fs_data
+  rootPath: /ceph
+  csi.storage.k8s.io/provisioner-secret-name: csi-cephfs-secret
+  csi.storage.k8s.io/provisioner-secret-namespace: default
+  csi.storage.k8s.io/controller-expand-secret-name: csi-cephfs-secret
+  csi.storage.k8s.io/controller-expand-secret-namespace: default
+  csi.storage.k8s.io/node-stage-secret-name: csi-cephfs-secret
+  csi.storage.k8s.io/node-stage-secret-namespace: default
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+#mountOptions:
+  #- discard
+EOF
+kubectl apply -f cephfs-storageclass.yaml
+```
+
+### 5.5.3 基于storeclass创建pvc
+
+```shell
+cat > csi-cephfs-pvc.yaml <<EOF
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: csi-cephfs-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: csi-cephfs-sc
+EOF
+```
+
+创建pvc：
+
+```shell
+kubectl apply -f csi-cephfs-pvc.yaml
+kubectl get pvc csi-cephfs-pvc
+NAME             STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS    AGE
+csi-cephfs-pvc   Bound    pvc-187aad99-c5a0-40de-80fe-7df93258983d   1Gi        RWX            csi-cephfs-sc   4s
+```
+
+### 5.5.4 创建pod应用pvc
+
+```shell
+cat > cephfs-pod.yaml <<EOF
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: csi-cephfs-demo-pod
+spec:
+  containers:
+    - name: web-server
+      image: nginx
+      volumeMounts:
+        - name: mypvc
+          mountPath: /var/lib/www
+  volumes:
+    - name: mypvc
+      persistentVolumeClaim:
+        claimName: csi-cephfs-pvc
+        readOnly: false
+EOF
+```
+
+创建测试pod：
+
+```shell
+kubectl apply -f cephfs-pod.yaml
+kubectl get pods csi-cephfs-demo-pod
+
+kubectl exec -ti csi-cephfs-demo-pod -- bash
+df -h
+Filesystem                                                                                                                                               Size  Used Avail Use% Mounted on
+overlay                                                                                                                                                  196G   34G  152G  19% /
+tmpfs                                                                                                                                                     64M     0   64M   0% /dev
+/dev/sdb3                                                                                                                                                196G   34G  152G  19% /etc/hosts
+shm                                                                                                                                                       64M     0   64M   0% /dev/shm
+192.168.80.55:6789,192.168.80.66:6789,192.168.80.77:6789:/volumes/csi/csi-vol-e944f84d-8de4-4e67-bb2f-6350feea6bcb/824971d2-d2f6-41cf-b20f-5d05539c1e98  1.0G     0  1.0G   0% /var/lib/www
+tmpfs                                                                                                                                                    5.7G   12K  5.7G   1% /run/secrets/kubernetes.io/serviceaccount
+tmpfs                                                                                                                                                    2.9G     0  2.9G   0% /proc/acpi
+tmpfs                                                                                                                                                    2.9G     0  2.9G   0% /proc/scsi
+tmpfs                                                                                                                                                    2.9G     0  2.9G   0% /sys/firmware
+
+# 写入文件，用于后续快照验证
+cd /var/lib/www;echo "abce" > test
+cat test
+```
+
+处理pod挂载不上问题：https://github.com/ceph/ceph-csi/issues/3927，sc内容注释掉mountOptions部分。
 
 
 
-
-
-
-参考：https://docs.ceph.com/en/quincy/install/get-packages
+参考：http://docs.ceph.com/en/quincy/install/get-packages
 
 cephadm 安装 ceph 集群：https://xwls.github.io/2023/02/16/ceph-cluster-install/
