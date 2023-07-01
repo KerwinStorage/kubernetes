@@ -1495,6 +1495,7 @@ cat ./*.yaml | grep image:
           image: quay.io/cephcsi/cephcsi:canary
           image: quay.io/cephcsi/cephcsi:canary
 
+# 自家的阿里云acr仓库，放心用。
 sed -i s#registry.k8s.io/sig-storage#registry.cn-hangzhou.aliyuncs.com/image-storage#g *.yaml
 sed -i s#quay.io/cephcsi#registry.cn-hangzhou.aliyuncs.com/image-storage#g *.yaml
 ```
