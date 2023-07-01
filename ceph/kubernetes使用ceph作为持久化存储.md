@@ -1727,13 +1727,9 @@ tmpfs                                                                           
 tmpfs                                                                                                                                                    2.9G     0  2.9G   0% /proc/acpi
 tmpfs                                                                                                                                                    2.9G     0  2.9G   0% /proc/scsi
 tmpfs                                                                                                                                                    2.9G     0  2.9G   0% /sys/firmware
-
-# 写入文件，用于后续快照验证
-cd /var/lib/www;echo "abce" > test
-cat test
 ```
 
-处理pod挂载不上问题：https://github.com/ceph/ceph-csi/issues/3927，sc内容注释掉mountOptions部分。
+**注：<font color=red>处理pod挂载不上问题：</font>https://github.com/ceph/ceph-csi/issues/3927，<font color=red>sc内容注释掉mountOptions部分。</font>**
 
 
 
