@@ -1462,7 +1462,7 @@ name: storageclass, metadata pool: cephfs_metadata, data pools: [cephfs_data ]
 
 ## 5.1.创建 ceph 子目录
 
-为了别的地方能挂载 cephfs，先创建一个 secretfile
+这里主要演示本地怎么去挂载cephfs。
 
 ```shell
 cat /etc/ceph/ceph.client.admin.keyring |grep key|awk -F" " '{print $3}' > /etc/ceph/admin.secret
