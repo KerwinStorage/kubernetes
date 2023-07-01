@@ -537,7 +537,7 @@ github：https://github.com/ceph/ceph-csi
 pg与pgs要根据实际情况修改。
 
 ```shell
-mkdir -p /root/ecph && cd /root/ecph
+mkdir -p /root/ceph && cd /root/ceph
 ceph osd pool create kubernetes 128 128
 ceph osd pool application enable kubernetes rbd
 # 初始化
