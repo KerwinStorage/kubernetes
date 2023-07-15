@@ -4,6 +4,8 @@
 
 GitHub：https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner
 
+官网：https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner
+
 | hostname     | ip address    | service    |
 | ------------ | ------------- | ---------- |
 | k8s-master01 | 192.168.80.45 | nfs 服务端 |
