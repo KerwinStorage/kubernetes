@@ -6,6 +6,8 @@
 
 lvm项目地址：https://github.com/openebs/lvm-localpv
 
+CNCF沙盒项目：https://www.cncf.io/sandbox-projects
+
 ## 1.1.本地创建vg
 
 ```shell
