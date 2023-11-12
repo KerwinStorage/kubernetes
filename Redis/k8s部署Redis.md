@@ -155,8 +155,6 @@ kubectl apply  -f  redis-config.yaml
 kubectl apply -f  redis-cluster.yaml
 ```
 
-
-
 https://www.dragonflydb.io/guides/redis-kubernetes
 
-https://www.codeleading.com/article/34566409164/
+https://www.codeleading.com/article/34566409164
