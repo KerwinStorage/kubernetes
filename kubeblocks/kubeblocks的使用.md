@@ -159,4 +159,4 @@ Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 mysql>
 ```
 
-注：具体操作在官网已经写得很清楚，具体不在操作，可以根据官网进行容器数量的修改和内存和cpu的修改。
+注：具体操作在官网已经写得很清楚，这里不在操作，可以根据官网进行容器数量的修改和内存和cpu的修改。
