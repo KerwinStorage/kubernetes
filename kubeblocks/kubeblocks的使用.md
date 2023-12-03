@@ -1,5 +1,9 @@
 # 								kubeblocks的使用
 
+介绍：它是基于 Kubernetes 的云原生数据基础设施，为用户提供了关系型数据库、NoSQL 数据库、向量数据库以及流计算系统的管理控制功能。可以使用提供的命令轻松部署处理数据库实例。
+
+github：https://github.com/apecloud/kubeblocks
+
 官网：https://kubeblocks.io
 
 ## 1.初步使用
