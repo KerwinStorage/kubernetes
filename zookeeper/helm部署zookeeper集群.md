@@ -1,4 +1,4 @@
-# 						helm部署zookeeper集群
+# 						helm部署Kafka集群
 
 # 1.准备文件
 
