@@ -1,8 +1,8 @@
 # 							Komodor的使用
 
-官网：[地址](https://komodor.com/)
-
 # 1.helm部署
+
+官网：[地址](https://komodor.com/) GitHub：[地址](https://github.com/komodorio)
 
 ```shell
 kubectl create ns komodor
