@@ -1,4 +1,4 @@
-# gitlab部署
+# 1.gitlab部署
 
 ```bash
 # 1.下载镜像
@@ -29,7 +29,7 @@ docker exec -it gitlab cat /etc/gitlab/initial_root_password
 
 注：gitlab比较消耗资源，内存给到4G
 
-# gitlab-runner部署
+# 2.gitlab-runner部署
 
 runner的作用就是给gitlab-ci提供了一个跑程序的环境，优先配置runner选择docker方式。
 
@@ -89,7 +89,7 @@ docker exec gitlab-runner gitlab-runner register -n \
 
 注：这里token注册获取方式有两个地方，一个是admin全局的另外一个是在仓库本地CICD配置中可以找到，会给到一个地址和一个token。
 
-## 本地部署
+## 3.本地部署
 
 本地部署在配置CICD界面会给出部署，下面就是根据官方提供的安装的，但是版本不和gitlab同步为15版本。
 
