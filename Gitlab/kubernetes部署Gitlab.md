@@ -64,7 +64,7 @@ spec:
     spec:
       containers:
       - name: gitlab
-        image: 'sameersbn/gitlab:14.1.0'
+        image: 'sameersbn/gitlab:16.1.3'
         ports:
         - name: ssh
           containerPort: 22
