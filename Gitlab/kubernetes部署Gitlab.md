@@ -1,12 +1,18 @@
-## 1. 部署
+# 							kubernetes部署Gitlab
 
-镜像地址：[Explore Docker's Container Image Repository | Docker Hub](https://hub.docker.com/search?q=sameersbn)
+# 1. yaml文件
+
+
 
 github地址：[sameersbn/docker-gitlab: Dockerized GitLab (github.com)](https://github.com/sameersbn/docker-gitlab)
 
 PostgreSQL：[Omnibus GitLab 附带的 PostgreSQL 版本 | 极狐GitLab](https://docs.gitlab.cn/jh/administration/package_information/postgresql_versions.html)
 
 环境变量介绍：[sameersbn/docker-gitlab： Dockerized GitLab (github.com)](https://github.com/sameersbn/docker-gitlab/#available-configuration-parameters)
+
+## 1.1.gitlab资源
+
+镜像地址：https://hub.docker.com/search?q=sameersbn
 
 ```bash
 ### gitlab
@@ -146,8 +152,13 @@ spec:
         hostPath:
           path: /etc/localtime
 EOF
+```
 
-### redis
+## 1.2.redis资源
+
+镜像地址：https://hub.docker.com/_/redis/tags
+
+```shell
 cat > redis-deploy.yaml <<EOF
 # Service
 kind: Service
@@ -234,6 +245,13 @@ spec:
         persistentVolumeClaim:
           claimName: gitlab-redis-pv-claim
 EOF
+```
+
+## 1.3.postgresql资源
+
+镜像地址：https://hub.docker.com/r/sameersbn/postgresql/tags
+
+```shell
 ### postgresql
 cat > postgresql-deploy.yaml <<EOF
 # Service
@@ -335,7 +353,7 @@ NAME                    PROVISIONER                                   RECLAIMPOL
 nfs-storage (default)   k8s-sigs.io/nfs-subdir-external-provisioner   Delete          Immediate           false                  21d
 ```
 
-启动：
+# 2.部署
 
 ```bash
 kubectl apply -f .
