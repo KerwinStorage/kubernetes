@@ -15,7 +15,6 @@ PostgreSQL：[Omnibus GitLab 附带的 PostgreSQL 版本 | 极狐GitLab](https:/
 镜像地址：https://hub.docker.com/search?q=sameersbn
 
 ```bash
-### gitlab
 cat > gitlab-deploy.yaml <<EOF
 # Service
 kind: Service
@@ -252,7 +251,6 @@ EOF
 镜像地址：https://hub.docker.com/r/sameersbn/postgresql/tags
 
 ```shell
-### postgresql
 cat > postgresql-deploy.yaml <<EOF
 # Service
 kind: Service
