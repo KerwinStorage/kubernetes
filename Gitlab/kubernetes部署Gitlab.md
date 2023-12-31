@@ -1,10 +1,6 @@
-# 							kubernetes部署Gitlab
+# 														kubernetes部署Gitlab
 
 # 1. yaml文件
-
-
-
-github地址：[sameersbn/docker-gitlab: Dockerized GitLab (github.com)](https://github.com/sameersbn/docker-gitlab)
 
 PostgreSQL：[Omnibus GitLab 附带的 PostgreSQL 版本 | 极狐GitLab](https://docs.gitlab.cn/jh/administration/package_information/postgresql_versions.html)
 
@@ -12,7 +8,7 @@ PostgreSQL：[Omnibus GitLab 附带的 PostgreSQL 版本 | 极狐GitLab](https:/
 
 ## 1.1.gitlab资源
 
-镜像地址：https://hub.docker.com/search?q=sameersbn
+镜像地址：https://hub.docker.com/r/sameersbn/gitlab/tags
 
 ```bash
 cat > gitlab-deploy.yaml <<EOF
@@ -69,7 +65,7 @@ spec:
     spec:
       containers:
       - name: gitlab
-        image: 'sameersbn/gitlab:16.1.3'
+        image: 'sameersbn/gitlab:16.7.0'
         ports:
         - name: ssh
           containerPort: 22
@@ -303,7 +299,7 @@ spec:
     spec:
       containers:
       - name: gitlab-postgresql
-        image: sameersbn/postgresql:12-20200524
+        image: sameersbn/postgresql:14-20230628
         ports:
         - name: postgres
           containerPort: 5432
