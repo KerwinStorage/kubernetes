@@ -82,6 +82,7 @@ zone "example.com" {
 
 ```shell
 sudo systemctl restart bind9
+sudo systemctl enable named.service
 ```
 
 ## 1.3.测试DNS服务
