@@ -1,4 +1,4 @@
-# 							Ubantu部署DNS服务
+# 													Ubantu部署DNS服务
 
 ## 1.1.安装Bind9
 
