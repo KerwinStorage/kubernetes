@@ -89,10 +89,25 @@ sudo systemctl restart bind9
 使用 `nslookup` 或 `dig` 工具测试你的DNS服务。例如：
 
 ```shell
-nslookup ns1.example.com localhost
+root@kb-virtual-machine:~# nslookup ns1.example.com localhost
 Server:         localhost
 Address:        127.0.0.1#53
 
 Name:   ns1.example.com
 Address: 192.168.80.10
 ```
+
+测试外网跳转解析：
+
+```shell
+root@kb-virtual-machine:~# nslookup baidu.com localhost
+Server:         localhost
+Address:        127.0.0.1#53
+
+Non-authoritative answer:
+Name:   baidu.com
+Address: 39.156.66.10
+Name:   baidu.com
+Address: 110.242.68.66
+```
+
