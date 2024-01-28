@@ -1,10 +1,13 @@
-# 						ubuntu22.04部署kubeadm1.26
-
-
-
-介绍：kubeadm 是一个工具，它帮助初始化和配置 Kubernetes 集群。下面是在 Ubuntu 22.04 上安装和部署 Kubernetes 使用 kubeadm 的基本步骤。请注意，在执行以下步骤之前，您需要有一组服务器或虚拟机，至少一台作为控制平面节点（master），以及可选的一台或多台作为工作节点（worker）。
-
 # 1.初始化操作
+
+介绍：kubeadm 是一个工具，它帮助初始化和配置 Kubernetes 集群。下面是在 **Ubuntu 22.04** 上安装和部署 Kubernetes 使用 kubeadm 的基本步骤。请注意，在执行以下步骤之前，您需要有一组服务器或虚拟机，至少一台作为控制平面节点（master），以及可选的一台或多台作为工作节点（worker）。
+
+| 主机名称     | IP地址         | 裸盘             | 说明               |
+| ------------ | -------------- | ---------------- | ------------------ |
+| k8s-master01 | 192.168.80.45  | /dev/sdb（200G） | master节点         |
+| k8s-node01   | 192.168.80.46  | /dev/sdb（200G） | node节点           |
+| k8s-node02   | 192.168.80.47  | /dev/sdb（200G） | node节点           |
+| kube-vip     | 192.168.80.100 |                  | apiserver的vip地址 |
 
 - 所有节点
 
@@ -13,7 +16,7 @@
 ```shell
 sudo apt update
 sudo apt upgrade -y
-apt install net-tools nfs-kernel-server curl vim git lvm2 telnet htop jq lrzsz tree bash-completion telnet wget make -y
+apt install net-tools nfs-kernel-server curl vim git lvm2 telnet htop jq lrzsz tree bash-completion telnet wget pssh make -y
 ```
 
 ## 1.2.修改主机名
@@ -25,6 +28,7 @@ hostnamectl set-hostname k8s-node02
 echo "192.168.80.45  k8s-master01" >> /etc/hosts
 echo "192.168.80.46  k8s-node01" >> /etc/hosts
 echo "192.168.80.47  k8s-node02" >> /etc/hosts
+echo "192.168.80.45  k8s-vip" >> /etc/hosts
 ```
 
 ## 1.3.安装ipvsadm
@@ -63,7 +67,7 @@ libcrc32c              16384  2 nf_conntrack,ip_vs
 
 ## 1.4.修改内核参数
 
-参考：https://kubernetes.io/docs/setup/production-environment/container-runtimes/
+参考：[https://kubernetes.io/docs/setup/production-environment/container-runtimes/](https://kubernetes.io/docs/setup/production-environment/container-runtimes/)
 
 ```shell
 cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
@@ -115,7 +119,21 @@ EOF
 sysctl --system
 ```
 
-## 1.5.安装 Docker
+## 1.5.节点免密
+
+- master节点操作
+
+```shell
+apt install -y sshpass
+ssh-keygen -f /root/.ssh/id_rsa -P ''
+export IP="k8s-master01 k8s-node01 k8s-node02"
+export SSHPASS=1qazZSE$
+for HOST in $IP;do
+     sshpass -e ssh-copy-id -o StrictHostKeyChecking=no $HOST
+done
+```
+
+## 1.6.安装 Docker
 
 Kubernetes 推荐 Docker 作为容器运行时，但它同样支持其他容器运行时，如 containerd 或 CRI-O。
 
@@ -145,9 +163,9 @@ systemctl restart docker.service
 docker info | grep systemd
 ```
 
-## 1.6.安装cri-dockerd
+## 1.7.安装cri-dockerd
 
-Github：https://github.com/Mirantis/cri-dockerd
+Github：[https://github.com/Mirantis/cri-dockerd](https://github.com/Mirantis/cri-dockerd)
 
 ```shell
 wget https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.8/cri-dockerd-0.3.8.amd64.tgz
@@ -234,7 +252,6 @@ EOF
 ```
 
 在 `ExecStart=/usr/bin/cri-dockerd --container-runtime-endpoint fd://` 后面加上 `--pod-infra-container-image=registry.aliyuncs.com/google_containers/pause:3.6`
-
 启动cri-dockerd：
 
 ```shell
@@ -243,9 +260,9 @@ systemctl enable cri-docker
 systemctl start cri-docker
 ```
 
-## 1.7.下载cni插件
+## 1.8.下载cni插件
 
-Github： https://github.com/containernetworking/plugins
+Github： [https://github.com/containernetworking/plugins](https://github.com/containernetworking/plugins)
 
 ```shell
 wget https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz
@@ -253,7 +270,7 @@ mkdir -pv /opt/cni/bin
 tar zxvf cni-plugins-linux-amd64-v1.3.0.tgz -C /opt/cni/bin/
 ```
 
-## 1.8.关闭 Swap
+## 1.9.关闭 Swap
 
 ```shell
 sudo swapoff -a
@@ -262,7 +279,7 @@ sed -ri 's/.*swap.*/#&/' /etc/fstab
 
 编辑 /etc/fstab 文件，注释掉 swap 相关的行，以便在重启时禁用 swap。
 
-## 1.9.配置ulimit
+## 1.10.配置ulimit
 
 ```shell
 ulimit -SHn 65535
@@ -276,7 +293,7 @@ cat >> /etc/security/limits.conf <<EOF
 EOF
 ```
 
-## 1.10.时间同步
+## 1.11.时间同步
 
 ```shell
 # 时间同步(服务端)
@@ -327,6 +344,8 @@ timedatectl
 
 ## 2.1.安装特定版本的 kubeadm, kubelet 和 kubectl
 
+- 全部节点操作
+
 添加 Kubernetes APT 仓库：
 
 ```shell
@@ -344,13 +363,22 @@ sudo apt-mark hold kubelet kubeadm kubectl
 
 ## 2.2.初始化 Kubernetes 集群
 
-配置kubelet驱动参考：https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/configure-cgroup-driver/
-
+配置kubelet驱动参考：[https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/configure-cgroup-driver](https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/configure-cgroup-driver/)
 在控制平面节点上执行：
 
 ```shell
-kubeadm init --image-repository registry.aliyuncs.com/google_containers --kubernetes-version=v1.26.0 --pod-network-cidr=10.244.0.0/16 --cri-socket /var/run/cri-dockerd.sock
-W0120 22:56:18.544778   85736 initconfiguration.go:119] Usage of CRI endpoints without URL scheme is deprecated and can cause kubelet errors in the future. Automatically prepending scheme "unix" to the "criSocket" with value "/var/run/cri-dockerd.sock". Please update your configuration!
+kubeadm config print init-defaults > kubeadm-config.yaml
+```
+
+初始化：
+`kubeadm init`命令参数参考：[链接](https://kubernetes.io/zh-cn/docs/reference/setup-tools/kubeadm/kubeadm-init/)
+kubeadm高可用：[链接](https://github.com/kubernetes/kubeadm/blob/main/docs/ha-considerations.md#options-for-software-load-balancing)
+
+```shell
+#kubeadm init --config kubeadm-config.yaml
+kubeadm init --image-repository registry.aliyuncs.com/google_containers --control-plane-endpoint=k8s-vip --apiserver-advertise-address=192.168.80.45 --kubernetes-version=v1.26.0 --pod-network-cidr=10.244.0.0/16 --cri-socket=unix:///var/run/cri-dockerd.sock
+
+# 执行结果
 [init] Using Kubernetes version: v1.26.0
 [preflight] Running pre-flight checks
 [preflight] Pulling images required for setting up a Kubernetes cluster
@@ -359,7 +387,7 @@ W0120 22:56:18.544778   85736 initconfiguration.go:119] Usage of CRI endpoints w
 [certs] Using certificateDir folder "/etc/kubernetes/pki"
 [certs] Generating "ca" certificate and key
 [certs] Generating "apiserver" certificate and key
-[certs] apiserver serving cert is signed for DNS names [k8s-master01 kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs [10.96.0.1 192.168.80.45]
+[certs] apiserver serving cert is signed for DNS names [k8s-master01 k8s-vip kubernetes kubernetes.default kubernetes.default.svc kubernetes.default.svc.cluster.local] and IPs [10.96.0.1 192.168.80.45]
 [certs] Generating "apiserver-kubelet-client" certificate and key
 [certs] Generating "front-proxy-ca" certificate and key
 [certs] Generating "front-proxy-client" certificate and key
@@ -385,13 +413,13 @@ W0120 22:56:18.544778   85736 initconfiguration.go:119] Usage of CRI endpoints w
 [control-plane] Creating static Pod manifest for "kube-scheduler"
 [etcd] Creating static Pod manifest for local etcd in "/etc/kubernetes/manifests"
 [wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory "/etc/kubernetes/manifests". This can take up to 4m0s
-[apiclient] All control plane components are healthy after 8.004019 seconds
+[apiclient] All control plane components are healthy after 12.510984 seconds
 [upload-config] Storing the configuration used in ConfigMap "kubeadm-config" in the "kube-system" Namespace
 [kubelet] Creating a ConfigMap "kubelet-config" in namespace kube-system with the configuration for the kubelets in the cluster
 [upload-certs] Skipping phase. Please see --upload-certs
 [mark-control-plane] Marking the node k8s-master01 as control-plane by adding the labels: [node-role.kubernetes.io/control-plane node.kubernetes.io/exclude-from-external-load-balancers]
 [mark-control-plane] Marking the node k8s-master01 as control-plane by adding the taints [node-role.kubernetes.io/control-plane:NoSchedule]
-[bootstrap-token] Using token: z7un58.jit5wky6r8j9q85u
+[bootstrap-token] Using token: mo2u0f.yvg991926b6uksfk
 [bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles
 [bootstrap-token] Configured RBAC rules to allow Node Bootstrap tokens to get nodes
 [bootstrap-token] Configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials
@@ -418,11 +446,20 @@ You should now deploy a pod network to the cluster.
 Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
   https://kubernetes.io/docs/concepts/cluster-administration/addons/
 
+You can now join any number of control-plane nodes by copying certificate authorities
+and service account keys on each node and then running the following as root:
+
+  kubeadm join k8s-vip:6443 --token mo2u0f.yvg991926b6uksfk \
+        --discovery-token-ca-cert-hash sha256:663e9f5fc3306526a9bb7fc39ac080b121d736b05202829cba082830873fa1ee \
+        --control-plane
+
 Then you can join any number of worker nodes by running the following on each as root:
 
-kubeadm join 192.168.80.45:6443 --token z7un58.jit5wky6r8j9q85u \
-        --discovery-token-ca-cert-hash sha256:d2ba21e417638a742319aa5427751f114ab33a49facb889b883a40ef79eb5e0b     
+kubeadm join k8s-vip:6443 --token mo2u0f.yvg991926b6uksfk \
+        --discovery-token-ca-cert-hash sha256:663e9f5fc3306526a9bb7fc39ac080b121d736b05202829cba082830873fa1ee
 ```
+
+- `--control-plane-endpoint=k8s-vip` 参数为后面部署kube-vip做预留准备，初始化时指向的是k8s-master01的地址，后续部署完指向kube-vip内的vip地址，本次vip为：`192.168.80.100`。
 
 # 3.启动kubeadm
 
@@ -441,50 +478,10 @@ echo "source <(kubectl completion bash)" >> ~/.bashrc
 source ~/.bashrc
 ```
 
-## 3.2.其他节点加入集群
+## 3.2.安装Calico
 
-- work节点操作
-
-```shell
-kubeadm join 192.168.80.45:6443  --cri-socket /var/run/cri-dockerd.sock --token z7un58.jit5wky6r8j9q85u \
-        --discovery-token-ca-cert-hash sha256:d2ba21e417638a742319aa5427751f114ab33a49facb889b883a40ef79eb5e0b
-W0120 23:03:32.924854  168443 initconfiguration.go:119] Usage of CRI endpoints without URL scheme is deprecated and can cause kubelet errors in the future. Automatically prepending scheme "unix" to the "criSocket" with value "/var/run/cri-dockerd.sock". Please update your configuration!
-[preflight] Running pre-flight checks
-[preflight] Reading configuration from the cluster...
-[preflight] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -o yaml'
-[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
-[kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
-[kubelet-start] Starting the kubelet
-[kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap...
-
-
-
-This node has joined the cluster:
-* Certificate signing request was sent to apiserver and a response was received.
-* The Kubelet was informed of the new secure connection details.
-
-Run 'kubectl get nodes' on the control-plane to see this node join the cluster.        
-```
-
-清理控制平面实例（如果有需要）
-
-```shell
-kubeadm reset --cri-socket /var/run/cri-dockerd.sock
-```
-
-- master节点操作
-
-```shell
-scp /etc/kubernetes/admin.conf root@192.168.80.46:$HOME/.kube/config
-scp /etc/kubernetes/admin.conf root@192.168.80.47:$HOME/.kube/config
-sudo chown $(id -u):$(id -g) $HOME/.kube/config
-```
-
-## 3.3.安装Calico
-
-注意对应的版本：https://docs.tigera.io/calico/latest/getting-started/kubernetes/requirements
-
-参考github内容：https://github.com/projectcalico/calico/blob/v3.26.0/manifests/calico.yaml
+注意对应的版本：[https://docs.tigera.io/calico/latest/getting-started/kubernetes/requirements](https://docs.tigera.io/calico/latest/getting-started/kubernetes/requirements)
+参考github内容：[https://github.com/projectcalico/calico/blob/v3.26.0/manifests/calico.yaml](https://github.com/projectcalico/calico/blob/v3.26.0/manifests/calico.yaml)
 
 ```shell
 mkdir -p $HOME/k8s-install/network && cd $HOME/k8s-install/network
@@ -568,20 +565,43 @@ UDP  10.96.0.10:53 rr
 
 # 5.启动kube-vip
 
-Github：https://github.com/kubernetes/kubeadm/blob/main/docs/ha-considerations.md
+链接地址：
 
-daemonset：https://kube-vip.io/docs/installation/daemonset
+- [Github地址](https://github.com/kubernetes/kubeadm/blob/main/docs/ha-considerations.md)
+- [Daemonset部署地址](https://kube-vip.io/docs/installation/daemonset)
 
-## 5.1.创建 RBAC 设置
+## 5.1.方式一-命令启动
 
-下载镜像地址实例：
+```shell
+# 设置要用于控制平面的地址：VIP
+export VIP=192.168.80.100
+# 将名称设置为控制平面上将宣布 VIP 的接口的名称。
+export INTERFACE=ens33
+# 通过解析 GitHub API 获取最新版本的 kube-vip 版本。此步骤需要并安装。
+KVVERSION=$(curl -sL https://api.github.com/repos/kube-vip/kube-vip/releases | jq -r ".[0].name")
+# 创建一个kube-vip 命令
+alias kube-vip="docker run --network host --rm ghcr.io/kube-vip/kube-vip:$KVVERSION"
+kube-vip manifest daemonset \
+    --interface $INTERFACE \
+    --address $VIP \
+    --inCluster \
+    --taint \
+    --controlplane \
+    --services \
+    --arp \
+    --leaderElection | tee kube-vip-ds.yaml
+```
 
-- docker.io/plndr/kube-vip:v0.6.4
-- ghcr.io/kube-vip/kube-vip:v0.6.4
+注：方式一只是做演示，后续如果对于命令部署感兴趣可以看看官网，目前部署使用第二种方式。
+
+## 5.2.方式二-DaemonSet启动
+
+### 5.2.1创建 RBAC 设置
 
 由于 kube-vip 作为 DaemonSet 作为常规资源而不是静态 Pod 运行，因此它仍然需要正确的访问权限才能监视 Kubernetes 服务和其他对象。为此，必须创建 RBAC 资源，其中包括 ServiceAccount、ClusterRole 和 ClusterRoleBinding，并可通过以下命令应用：
 
 ```shell
+mkdir -p  ~/kube-vip && cd ~/kube-vip
 # https://kube-vip.io/manifests/rbac.yaml
 cat > kube-vip-rabc.yaml <<EOF
 apiVersion: v1
@@ -628,31 +648,12 @@ subjects:
 EOF
 ```
 
-## 5.2.方式一
+### 5.2.2创建资源
 
-```shell
-# 设置要用于控制平面的地址：VIP
-export VIP=192.168.80.100
-# 将名称设置为控制平面上将宣布 VIP 的接口的名称。
-export INTERFACE=ens33
-# 通过解析 GitHub API 获取最新版本的 kube-vip 版本。此步骤需要并安装。
-KVVERSION=$(curl -sL https://api.github.com/repos/kube-vip/kube-vip/releases | jq -r ".[0].name")
-# 创建一个kube-vip 命令
-alias kube-vip="docker run --network host --rm ghcr.io/kube-vip/kube-vip:$KVVERSION"
-kube-vip manifest daemonset \
-    --interface $INTERFACE \
-    --address $VIP \
-    --inCluster \
-    --taint \
-    --controlplane \
-    --services \
-    --arp \
-    --leaderElection | tee kube-vip-ds.yaml
-```
+下载镜像地址实例：
 
-这里只是根据文档演示做出来，但是暂时不使用`kube-vip`作为启动命令而是使用下面的`DaemonSet`。
-
-## 5.3.方式二
+- [docker.io/plndr/kube-vip:v0.6.4](https://hub.docker.com/r/plndr/kube-vip/tags)
+- ghcr.io/kube-vip/kube-vip:v0.6.4
 
 ```shell
 cat > kube-vip-ds.yaml <<EOF
@@ -713,7 +714,7 @@ spec:
         - name: vip_retryperiod
           value: "1"
         - name: address
-          value: 192.168.80.100
+          value: 192.168.80.100  #定义的vip地址
         image: ghcr.io/kube-vip/kube-vip:v0.6.4
         imagePullPolicy: Always
         name: kube-vip
@@ -747,9 +748,8 @@ EOF
   value: "24"
 ```
 
-github问题链接：https://github.com/kube-vip/kube-vip/issues/324
-
-## 5.4.创建资源
+github问题链接：[https://github.com/kube-vip/kube-vip/issues/324](https://github.com/kube-vip/kube-vip/issues/324)
+创建资源：
 
 ```shell
 kubectl apply -f kube-vip-rabc.yaml
@@ -764,33 +764,130 @@ kubectl get ServiceAccount -n kube-system | grep kube-vip
 kube-vip                             0         45m
 ```
 
-# 6.openlocal
+### 5.2.3查看master节点网关
 
-Github：https://github.com/alibaba/open-local/blob/main/README_zh_CN.md
+```shell
+ip addr
+2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 00:0c:29:7e:01:43 brd ff:ff:ff:ff:ff:ff
+    altname enp2s1
+    inet 192.168.80.45/24 brd 192.168.80.255 scope global noprefixroute ens33
+       valid_lft forever preferred_lft forever
+    inet 192.168.80.100/32 scope global ens33 # 这里可以看到我们的vip地址
+       valid_lft forever preferred_lft forever
+    inet6 fe80::1b63:e692:3239:41db/64 scope link noprefixroute
+       valid_lft forever preferred_lft forever
+5: kube-ipvs0: <BROADCAST,NOARP> mtu 1500 qdisc noop state DOWN group default
+    link/ether 02:67:68:41:61:e5 brd ff:ff:ff:ff:ff:ff
+    inet 10.96.0.1/32 scope global kube-ipvs0
+       valid_lft forever preferred_lft forever
+    inet 10.96.0.10/32 scope global kube-ipvs0
+       valid_lft forever preferred_lft forever
+       
+# 测试ip地址连通性
+telnet 192.168.80.100 6443
+Trying 192.168.80.100...
+Connected to 192.168.80.100.
+Escape character is '^]'.
+```
 
-镜像下载地址参考：https://hub.docker.com/search?q=openlocal
+结尾：本地`apiserver-vip`地址已经可以访问到，后续逻辑就是需要重创建k8s集群时签发的证书，将vip地址加入进去然后重新将证书在分配到每一个节点上。
 
-## 6.1创建lvm
+# 6.其他节点加入集群
 
-参考：https://en.wikipedia.org/wiki/Logical_Volume_Manager_(Linux)
+- work节点操作
+
+修改hosts：
+
+```shell
+echo "192.168.80.100  k8s-vip" >> /etc/hosts
+```
+
+node节点初始化：
+
+```shell
+kubeadm join k8s-vip:6443 --cri-socket=unix:///var/run/cri-dockerd.sock --token mo2u0f.yvg991926b6uksfk \
+        --discovery-token-ca-cert-hash sha256:663e9f5fc3306526a9bb7fc39ac080b121d736b05202829cba082830873fa1ee
+[preflight] Running pre-flight checks
+[preflight] Reading configuration from the cluster...
+[preflight] FYI: You can look at this config file with 'kubectl -n kube-system get cm kubeadm-config -o yaml'
+[kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+[kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+[kubelet-start] Starting the kubelet
+[kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap...
+This node has joined the cluster:
+* Certificate signing request was sent to apiserver and a response was received.
+* The Kubelet was informed of the new secure connection details.
+
+Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+```
+
+清理控制平面实例（如果有需要）
+
+```shell
+# 设置为不可调度及驱逐节点
+kubectl cordon  k8s-node01
+kubectl drain k8s-node01 --delete-local-data --force --ignore-daemonsets
+# 删除节点
+kubectl delete node  k8s-node01
+# 清空节点
+kubeadm reset --cri-socket /var/run/cri-dockerd.sock
+```
+
+- 复制config配置文件
+
+```shell
+# master操作
+scp /etc/kubernetes/admin.conf root@192.168.80.46:$HOME/.kube/config
+scp /etc/kubernetes/admin.conf root@192.168.80.47:$HOME/.kube/config
+
+# node节点操作
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
+
+# 7.openlocal
+
+Github：[https://github.com/alibaba/open-local/blob/main/README_zh_CN.md](https://github.com/alibaba/open-local/blob/main/README_zh_CN.md)
+镜像下载地址参考：[https://hub.docker.com/search?q=openlocal](https://hub.docker.com/search?q=openlocal)
+
+## 7.1.创建lvm
+
+参考：[https://en.wikipedia.org/wiki/Logical_Volume_Manager_(Linux)](https://en.wikipedia.org/wiki/Logical_Volume_Manager_(Linux))
 
 ```shell
 apt install lvm2 -y
 ```
 
-## 6.2.helm
+## 7.2.helm安装指南
 
 前提：[helm3](https://helm.sh/zh/docs/intro/install/)已经部署完成。
 
-## 6.3.前期准备
+## 7.3.部署open-local
 
-kube-scheduler 配置：https://github.com/alibaba/open-local/blob/main/docs/user-guide/kube-scheduler-configuration.md
+kube-scheduler 配置：[https://github.com/alibaba/open-local/blob/main/docs/user-guide/kube-scheduler-configuration.md](https://github.com/alibaba/open-local/blob/main/docs/user-guide/kube-scheduler-configuration.md)
 
-每个节点都需要创建
+| 主机         | 裸盘           |
+| ------------ | -------------- |
+| k8s-master01 | /dev/sdb：200G |
+| k8s-node01   | /dev/sdb：200G |
+| k8s-node02   | /dev/sdb：200G |
+
+- 每个节点都需要创建
+
+初始化磁盘：
+
+```shell
+pvcreate /dev/sdb
+pvscan
+vgcreate open-local-pool-0  /dev/sdb
+vgdisplay
+```
+
+关于`apiVersion`在1.26版本内废弃`v1beta1`：[链接](https://kubernetes.io/zh-cn/docs/reference/scheduling/config/)
 
 ```shell
 cat > /etc/kubernetes/kube-scheduler-configuration.yaml <<EOF
-apiVersion: kubescheduler.config.k8s.io/v1beta1
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: /etc/kubernetes/scheduler.conf # your kubeconfig filepath 也就是我们的.kube/config文件
@@ -807,7 +904,7 @@ EOF
 如果你的 kube-scheduler 是静态 pod，请像这样配置 kube-scheduler 文件：
 
 ```shell
-kubectl  get  pod  -n kube-system  kube-scheduler-k8s-master01 -o yaml > kube-scheduler.yaml
+vim /etc/kubernetes/manifests/kube-scheduler.yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -883,105 +980,7 @@ spec:
     name: localtime
 ```
 
-
-
-```shell
-apiVersion: v1
-kind: Pod
-metadata:
-  annotations:
-    kubernetes.io/config.hash: f401139a78a33a7df9f8aa23049af2cf
-    kubernetes.io/config.mirror: f401139a78a33a7df9f8aa23049af2cf
-    kubernetes.io/config.source: file
-  labels:
-    component: kube-scheduler
-    tier: control-plane
-  name: kube-scheduler-k8s-master01
-  namespace: kube-system
-  ownerReferences:
-  - apiVersion: v1
-    controller: true
-    kind: Node
-    name: k8s-master01
-    uid: a10cdb9e-dfa9-4e80-b3fb-4614fc3399f7
-  uid: f0a0e226-7b9c-47e6-927a-4b1a0fbbe856
-spec:
-  containers:
-  - command:
-    - kube-scheduler
-    - --authentication-kubeconfig=/etc/kubernetes/scheduler.conf
-    - --authorization-kubeconfig=/etc/kubernetes/scheduler.conf
-    - --bind-address=127.0.0.1
-    - --kubeconfig=/etc/kubernetes/scheduler.conf
-    - --leader-elect=true
-    - --config=/etc/kubernetes/kube-scheduler-configuration.yaml
-    image: registry.aliyuncs.com/google_containers/kube-scheduler:v1.26.0
-    imagePullPolicy: IfNotPresent
-    livenessProbe:
-      failureThreshold: 8
-      httpGet:
-        host: 127.0.0.1
-        path: /healthz
-        port: 10259
-        scheme: HTTPS
-      initialDelaySeconds: 10
-      periodSeconds: 10
-      successThreshold: 1
-      timeoutSeconds: 15
-    name: kube-scheduler
-    resources:
-      requests:
-        cpu: 100m
-    startupProbe:
-      failureThreshold: 24
-      httpGet:
-        host: 127.0.0.1
-        path: /healthz
-        port: 10259
-        scheme: HTTPS
-      initialDelaySeconds: 10
-      periodSeconds: 10
-      successThreshold: 1
-      timeoutSeconds: 15
-    terminationMessagePath: /dev/termination-log
-    terminationMessagePolicy: File
-    volumeMounts:
-    - mountPath: /etc/kubernetes/scheduler.conf
-      name: kubeconfig
-      readOnly: true
-    - mountPath: /etc/kubernetes/kube-scheduler-configuration.yaml
-      name: scheduler-policy-config
-      readOnly: true  
-  dnsPolicy: ClusterFirst
-  enableServiceLinks: true
-  hostNetwork: true
-  nodeName: k8s-master01
-  preemptionPolicy: PreemptLowerPriority
-  priority: 2000001000
-  priorityClassName: system-node-critical
-  restartPolicy: Always
-  schedulerName: default-scheduler
-  securityContext:
-    seccompProfile:
-      type: RuntimeDefault
-  terminationGracePeriodSeconds: 30
-  tolerations:
-  - effect: NoExecute
-    operator: Exists
-  volumes:
-  - hostPath:
-      path: /etc/kubernetes/scheduler.conf
-      type: FileOrCreate
-    name: kubeconfig
-  - hostPath:
-      path: /etc/kubernetes/kube-scheduler-configuration.yaml
-      type: File
-    name: scheduler-policy-config
-```
-
-
-
-
+部署openlocal：
 
 ```shell
 wget -O "open-local-0.7.1.tar.gz" https://github.com/alibaba/open-local/archive/refs/tags/v0.7.1.tar.gz
@@ -989,10 +988,10 @@ tar xf open-local-0.7.1.tar.gz
 cd open-local-0.7.1/helm
 # 批量替换values.yaml镜像地址，ack-agility-registry.cn-shanghai.cr.aliyuncs.com 这个地址给去掉
 sed -i "s/ecp_builder\///g" values.yaml
+sed -i "s/ack-agility-registry.cn-shanghai.cr.aliyuncs.com/openlocal/g" values.yaml
+sed -i "s/init_job: true/init_job: false/g" values.yaml
 
-init_job: true >> init_job: false
-
-cat values.yaml | grep image:
+# 部署
 helm install open-local .
 ```
 
@@ -1073,7 +1072,7 @@ kubectl describe node k8s-master01  | grep Taints
 Taints:             node-role.kubernetes.io/control-plane:NoSchedule
 
 kubectl describe nodes | grep -E '(Roles|Taints)'
-kubectl taint node k8s-master01 node-role.kubernetes.io=control-plane-
+kubectl taint node k8s-master01  node-role.kubernetes.io/control-plane-
 
 
 # 查看yaml内的内容，哪些不符合规则
@@ -1084,6 +1083,10 @@ kubectl get replicasets.apps -n kube-system open-local-scheduler-extender-6fffd8
               - key: node-role.kubernetes.io/master
                 operator: Exists
 ```
+
+- NoSchedule：表示k8s将不会将Pod调度到具有该污点的Node上
+- PreferNoSchedule：表示k8s将尽量避免将Pod调度到具有该污点的Node上
+- NoExecute：表示k8s将不会将Pod调度到具有该污点的Node上，同时会将Node上已经存在的Pod驱逐出去
 
 具体来说，这是一个节点选择器（Node Selector）的配置。这段配置的含义是：
 
@@ -1099,30 +1102,124 @@ kubectl get replicasets.apps -n kube-system open-local-scheduler-extender-6fffd8
 kubectl label node k8s-master01 node-role.kubernetes.io/master=Exists
 ```
 
-
-
-
-
-
+## 7.4.查看创建资源情况
 
 ```shell
-
+# 查看容器启动
 kubectl get pod -n kube-system  | grep open-local
 open-local-agent-kjt5p                           3/3     Running   0            27m
 open-local-agent-nk8xq                           3/3     Running   0            27m
 open-local-agent-r7rl7                           3/3     Running   0            27m
 open-local-controller-85987bffd9-z5kjn           6/6     Running   0            27m
 open-local-scheduler-extender-6fffd89747-nmt58   1/1     Running   0            13m
+
+# 查看
+kubectl get  sc
+NAME                    PROVISIONER            RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+open-local-device-hdd   local.csi.aliyun.com   Delete          WaitForFirstConsumer   false                  16m
+open-local-device-ssd   local.csi.aliyun.com   Delete          WaitForFirstConsumer   false                  16m
+open-local-lvm          local.csi.aliyun.com   Delete          WaitForFirstConsumer   true                   16m
+open-local-lvm-xfs      local.csi.aliyun.com   Delete          WaitForFirstConsumer   true                   16m
 ```
 
+## 7.5.配置nlsc
+
+```shell
+kubectl edit nlsc open-local
+# yaml内容
+apiVersion: csi.aliyun.com/v1alpha1
+kind: NodeLocalStorageInitConfig
+metadata:
+  annotations:
+    meta.helm.sh/release-name: open-local
+    meta.helm.sh/release-namespace: default
+  creationTimestamp: "2024-01-28T12:25:42Z"
+  generation: 2
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: open-local
+    app.kubernetes.io/version: v0.7.1
+    helm.sh/chart: open-local-v0.7.1
+  name: open-local
+  resourceVersion: "20420"
+  uid: 20c75b0c-4a32-431d-bf25-244480046eb7
+spec:
+  globalConfig:
+    listConfig:
+      vgs:
+        include:
+        - open-local-pool-[0-9]+
+        - yoda-pool[0-9]+
+        - ackdistro-pool
+    resourceToBeInited:
+      vgs:
+      - devices:
+        - /dev/sdb # 这里就是我们本地的磁盘
+        name: open-local-pool-0
+```
+
+## 7.6.查看磁盘分配情况
+
+```shell
+# vg
+vgdisplay
+  --- Volume group ---
+  VG Name               open-local-pool-0
+  System ID
+  Format                lvm2
+  Metadata Areas        1
+  Metadata Sequence No  1
+  VG Access             read/write
+  VG Status             resizable
+  MAX LV                0
+  Cur LV                0
+  Open LV               0
+  Max PV                0
+  Cur PV                1
+  Act PV                1
+  VG Size               <200.00 GiB
+  PE Size               4.00 MiB
+  Total PE              51199
+  Alloc PE / Size       0 / 0
+  Free  PE / Size       51199 / <200.00 GiB
+  VG UUID               QD7qVJ-myrj-ezts-jBL1-3D3C-3zlp-ReoquF
+
+# pv
+pvdisplay
+  --- Physical volume ---
+  PV Name               /dev/sdb
+  VG Name               open-local-pool-0
+  PV Size               200.00 GiB / not usable 4.00 MiB
+  Allocatable           yes
+  PE Size               4.00 MiB
+  Total PE              51199
+  Free PE               51199
+  Allocated PE          0
+  PV UUID               nDlewm-IKTg-qR5V-BBig-6jO4-8V0x-jIhD4X
+```
+
+# 8.卸载
+
+```shell
+kubeadm reset -f
+modprobe -r ipip
+lsmod
+rm -rf ~/.kube/
+rm -rf /etc/kubernetes/
+rm -rf /etc/systemd/system/kubelet.service.d
+rm -rf /etc/systemd/system/kubelet.service
+rm -rf /usr/bin/kube*
+rm -rf /etc/cni
+rm -rf /opt/cni
+rm -rf /var/lib/etcd
+rm -rf /var/etcd
+apt-get autoremove kubeadm kubectl kubelet  --allow-change-held-packages -y
+```
+
+注：慎用上面的命令，加入的新机器最好是没有使用过的。
 问题链接：[地址](https://stackoverflow.com/questions/60166842/pod-is-in-pending-stage-error-failedscheduling-nodes-didnt-match-node-sel)
-
-
-
 参考：
 
-https://ost.51cto.com/posts/12603
-
-https://blog.csdn.net/zhanglu0302/article/details/128111040
-
-https://blog.csdn.net/guanfengliang1988/article/details/128456753c
+- [https://ost.51cto.com/posts/12603](https://ost.51cto.com/posts/12603)
+- [https://blog.csdn.net/zhanglu0302/article/details/128111040](https://blog.csdn.net/zhanglu0302/article/details/128111040)
+- [https://blog.csdn.net/guanfengliang1988/article/details/128456753c](https://blog.csdn.net/guanfengliang1988/article/details/128456753c)

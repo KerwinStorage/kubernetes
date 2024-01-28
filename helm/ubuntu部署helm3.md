@@ -44,7 +44,7 @@
    helm list
    ```
 
-7. 命令永久补全:
+7. **命令永久补全**:
 
    ```shell
    echo 'source <(helm completion bash)' >>~/.bashrc
