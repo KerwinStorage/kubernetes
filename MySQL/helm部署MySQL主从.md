@@ -213,6 +213,27 @@ To connect to your database:
       mysql -h mysql-cluster-secondary.mysql.svc.cluster.local -uroot -p"$MYSQL_ROOT_PASSWORD"
 ```
 
+查看创建的所有资源：
+
+```shell
+kubectl get all -n mysql
+NAME                            READY   STATUS    RESTARTS   AGE
+pod/mysql-cluster-primary-0     1/1     Running   0          69m
+pod/mysql-cluster-secondary-0   1/1     Running   0          69m
+
+NAME                                       TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+service/mysql-cluster-primary              ClusterIP   10.107.166.168   <none>        3306/TCP   69m
+service/mysql-cluster-primary-headless     ClusterIP   None             <none>        3306/TCP   69m
+service/mysql-cluster-secondary            ClusterIP   10.101.7.132     <none>        3306/TCP   69m
+service/mysql-cluster-secondary-headless   ClusterIP   None             <none>        3306/TCP   69m
+
+NAME                                       READY   AGE
+statefulset.apps/mysql-cluster-primary     1/1     69m
+statefulset.apps/mysql-cluster-secondary   1/1     69m
+```
+
+
+
 ## 2.2.遇到的问题汇总
 
 ### 2.2.1创建目录失败

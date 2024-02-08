@@ -8,7 +8,23 @@ lvm项目地址：https://github.com/openebs/lvm-localpv
 
 CNCF沙盒项目：https://www.cncf.io/sandbox-projects
 
-## 1.1.本地创建vg
+## 1.1.先决条件
+
+**验证是否配置了 iSCSI 服务**
+
+参考：https://openebs.io/docs/user-guides/prerequisites
+
+```shell
+# Install iSCSI tools
+sudo apt-get update
+sudo apt-get install open-iscsi
+sudo cat /etc/iscsi/initiatorname.iscsi
+systemctl status iscsid
+# 开机自启
+sudo systemctl enable --now iscsid
+```
+
+## 1.2.本地创建vg
 
 ```shell
 apt install lvm2 -y
@@ -20,7 +36,7 @@ sudo vgcreate lvmvg /dev/loop0
 
 注意：这里根据自己需求看是否全部的node节点都需要使用lvm做本地存储，也可以选择部分节点，这里就是根据所有节点都需要去配置。
 
-## 1.2.OpenEBS LVM安装
+## 1.3.OpenEBS LVM安装
 
 最新配置文件：https://openebs.github.io/charts/lvm-operator.yaml
 
@@ -66,9 +82,9 @@ openebs-lvm-node-cnzfc     2/2     Running   0             23h
 openebs-lvm-node-zr8fz     2/2     Running   0             23h
 ```
 
-## 1.3.使用lvm作为持久化
+## 1.4.使用lvm作为持久化
 
-### 1.3.1.创建storage
+### 1.4.1.创建storage
 
 默认模版：
 
@@ -105,7 +121,7 @@ allowedTopologies:
       - lvmpv-node2
 ```
 
-### 1.3.2.创建pvc
+### 1.4.2.创建pvc
 
 ```shell
 cat > pvc.yaml <<EOF
@@ -123,7 +139,7 @@ spec:
 EOF
 ```
 
-### 1.3.3.部署应用程序
+### 1.4.3.部署应用程序
 
 ```shell
 cat > fio.yaml <<EOF
