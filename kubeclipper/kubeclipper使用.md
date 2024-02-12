@@ -158,7 +158,7 @@ web地址：http://192.168.80.45，账户密码：`admin / Thinkbig1`。
 
 ![img](https://img2024.cnblogs.com/blog/1740081/202402/1740081-20240212191709357-1859406030.png)
 
-结尾：控制台有很多功能可以使用，这里就不在一一赘述。完
+结尾：因为节点是一个单master所以没有部署[高可用版本](https://kubeclipper.io/docs/deployment-docs/ha-deploy/)。控制台有很多功能可以使用，这里就不在一一赘述。完
 
 参考文档：
 
