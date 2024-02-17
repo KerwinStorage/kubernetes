@@ -122,7 +122,7 @@ GlusterFS客户端常用命令：
 | gluster volume quota disable       | 关闭卷配额 |
 | gluster volume quota limitusage    | 设定卷配额 |
 
-关于卷的类型：[官网链接](https://docs.gluster.org/en/latest/Administrator-Guide/Setting-Up-Volumes/#arbiter-configuration-for-replica-volumes) 可以查看这个链接，本次创建卷只用于演示，后期我们使用kubernetes操作是容器会自动对本地磁盘做操作。
+关于卷的类型：[官网链接](https://docs.gluster.org/en/latest/Administrator-Guide/Setting-Up-Volumes/#arbiter-configuration-for-replica-volumes) 可以查看这个链接，本次创建卷只用于演示。后期我们会使用kadalu操作容器自动对本地磁盘进行持久化操作。
 
 ```shell
 # 创建分布式卷，卷名是gv1
@@ -859,7 +859,7 @@ spec:
   type: Replica3
   storage:
     - node: k8s-master01 # 主机名
-      device: /dev/sdc # 之前已经挂载好的
+      device: /dev/sdc # 之前准备的磁盘
     - node: k8s-node01
       device: /dev/sdc
     - node: k8s-node02
@@ -917,7 +917,7 @@ tmpfs            7.7G   12K  7.7G   1% /run/secrets/kubernetes.io/serviceaccount
 
 # 3.卷操作
 
-查看本地storage相关资源
+查看本地storage相关资源：
 
 ```shell
 kubectl get kds,sc
@@ -974,8 +974,6 @@ ls /mnt/replica3/subvol/3e/db/pvc-64893704-138a-4efb-9c6f-b9b14aaa4669/
 cat /mnt/replica3/info/subvol/3e/db/pvc-64893704-138a-4efb-9c6f-b9b14aaa4669.json
 {"size": 1073741824, "path_prefix": "subvol/3e/db"}
 ```
-
-
 
 参考文档：
 
