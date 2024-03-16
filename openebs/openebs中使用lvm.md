@@ -1,4 +1,4 @@
-# 		 探索在openebs中使用lvm做持久化
+# 		 			探索在openebs中使用lvm做持久化
 
 # 1.部署
 
@@ -96,7 +96,7 @@ metadata:
   name: openebs-lvmpv
 parameters:
   storage: "lvm"
-  volgroup: "carina-vg-ssd"
+  volgroup: "lvmvg"
 provisioner: local.csi.openebs.io
 EOF
 ```
